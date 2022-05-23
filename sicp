@@ -1,0 +1,152 @@
+#!/bin/bash
+#
+# Copyright (c) 2022 Joshua Hughes <kivhift@gmail.com>
+#
+set -eu -o pipefail
+
+print_usage() {
+    echo "
+usage: ${0##*/} [-a] [-e <exer>] [-h] [-n <exer>] [-t <exer>] [-T <exers>] [-w <exer>]
+
+ -a: test all
+ -e <exer>: edit files related to <exer>
+ -h: print help
+ -n <exer>: create new exercise and associated test file
+ -t <exer>: test <exer>
+ -T <exers>: read files to test from <exers>
+ -w <exer>: watch/run associated files via entr (useful while developing)
+
+Use this script to test existing exercise solutions or create new ones.  The
+exercises <exer> are specified as they are in the SICP book and manual; e.g.,
+1.28 for book exercise 1.28 or m1.16 for exercise 1.16 from the manual.
+"
+}
+
+die() {
+    local usage=
+    [ $# -gt 0 ] && [ "$1" = "-u" ] && usage="y" && shift
+    [ $# -gt 0 ] && echo -e "\n ** $@"
+    [ "$usage" ] && print_usage
+    exit 1
+}
+
+[ $# -gt 0 ] || die -u "You didn't give any arguments"
+
+match_ex() {
+    [[ $1 =~ (m?)([0-9]+)[.]([0-9]+) ]] \
+        || die "$1 should be <chapter>.<exercise>; e.g., 1.42"
+}
+
+ex_name() {
+    match_ex $1
+    printf "ch%u/ex%s%02u.scm" \
+        ${BASH_REMATCH[2]} \
+        "${BASH_REMATCH[1]}" \
+        ${BASH_REMATCH[3]}
+}
+
+test_name() {
+    match_ex $1
+    printf "ch%u/t-ex%s%02u.scm" \
+        ${BASH_REMATCH[2]} \
+        "${BASH_REMATCH[1]}" \
+        ${BASH_REMATCH[3]}
+}
+
+test_bin() {
+    local bin=
+    for bin in $*; do
+        command -v $bin > /dev/null \
+            || die "Could not find needed executable: $bin"
+    done
+}
+
+run_test() {
+    test_bin scheme
+    local -r ch=${1%%/*} name=${1##*/}
+    # Spawning a sub-shell for each test isn't the most efficient way to go
+    # about things but it makes the directory handling easier...
+    (
+        cd $ch || die "Couldn't cd to $ch"
+        echo "Executing $name"
+        scheme --quiet --load ../util/print.scm \
+            --load ${name##t-} --load $name \
+            --load ../util/test.scm \
+            || die "Test $1 indicated an error"
+    )
+}
+
+# Use an associative array to hold tests so as to have unique names.
+declare -A to_test=()
+while getopts ":ae:hn:T:t:w:" opt; do
+    case $opt in
+    a)
+        test_bin find sort
+
+        declare tst=
+        for tst in $(find ch* -type f -name 't-ex*.scm' | sort); do
+            run_test $tst
+        done
+        exit 0
+        ;;
+    e)
+        test_bin vim
+        declare -r ex=$(ex_name $OPTARG) t=$(test_name $OPTARG)
+        exec vim -p $ex $t
+        ;;
+    h)
+        print_usage
+        exit 0
+        ;;
+    n)
+        declare -r ex=$(ex_name $OPTARG) t=$(test_name $OPTARG)
+        [ ! -r $ex ] || die "Exercise file already exists: $ex"
+        [ ! -r $t ]  || die "Test file already exists: $t"
+        echo "; Exercise $OPTARG" > $ex || die "Could not produce $ex"
+        echo -e "; Test $OPTARG\n(define (tests-OK?)\n  (and\n    #f\n))" > $t \
+            || die "Could not produce $t"
+        echo "Created $ex and $t"
+        exit 0
+        ;;
+    T)
+        [ -r $OPTARG ] || die -u "Could not open $OPTARG for reading"
+        declare -a line
+        while read -a line; do
+            for opt in ${line[*]}; do
+                to_test[$opt]=1
+            done
+        done < $OPTARG
+        ;;
+    t)
+        to_test[$OPTARG]=1
+        ;;
+    w)
+        test_bin entr
+        echo "Watching/running files for $OPTARG"
+        # Let entr complain if the files aren't there...
+        echo -e "$(ex_name $OPTARG)\n$(test_name $OPTARG)" \
+            | entr ${BASH_SOURCE[0]} -t $OPTARG
+        exit 0
+        ;;
+    :)
+        die -u "-$OPTARG requires an argument"
+        ;;
+    ?)
+        die -u "Invalid option given: $OPTARG"
+        ;;
+    esac
+done
+
+[ ${#to_test[*]} -gt 0 ] || die -u "You didn't given anything to test"
+
+declare -a test_files=()
+declare x name
+for x in ${!to_test[*]}; do
+    name=$(test_name $x)
+    [ -r $name ] || die "Could not find $name or it's not readable"
+    test_files+=($name)
+done
+
+for name in ${test_files[*]}; do
+    run_test $name
+done

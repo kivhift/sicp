@@ -1,0 +1,5 @@
+(define (pascals-triangle r c)
+  (cond ((or (< r 0) (< c 0) (> c r)) 0)
+        ((or (= c 0) (= c r)) 1)
+        (#t (+ (pascals-triangle (- r 1) c)
+               (pascals-triangle (- r 1) (- c 1))))))

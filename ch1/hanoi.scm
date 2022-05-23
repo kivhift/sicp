@@ -1,0 +1,8 @@
+(define (move-tower size from to via)
+  (define (print-move)
+    (display "move top disk from ")
+    (display from) (display " to ") (display to) (newline))
+  (cond ((= size 0) #t)
+    (else (move-tower (- size 1) from via to)
+          (print-move)
+          (move-tower (- size 1) via to from))))
