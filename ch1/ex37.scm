@@ -7,3 +7,5 @@
   (iter 1))
 
 (define phi (/ (+ 1 (sqrt 5)) 2))
+
+; Skipping part b)
