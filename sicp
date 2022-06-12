@@ -92,7 +92,7 @@ while getopts ":ae:hn:T:t:w:" opt; do
     e)
         test_bin vim
         declare -r ex=$(ex_name $OPTARG) t=$(test_name $OPTARG)
-        exec vim -p $ex $t
+        exec vim -o $ex $t
         ;;
     h)
         print_usage
