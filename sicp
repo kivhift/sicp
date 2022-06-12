@@ -6,9 +6,11 @@ set -eu -o pipefail
 
 print_usage() {
     echo "
-usage: ${0##*/} [-a] [-e <exer>] [-h] [-n <exer>] [-t <exer>] [-T <exers>] [-w <exer>]
+usage: ${0##*/} [-A] [-a <exer>] [-e <exer>] [-h] [-n <exer>] [-t <exer>]
+    [-T <exers>] [-w <exer>]
 
- -a: test all
+ -A: test all
+ -a <exer>: add files related to <exer> to git repo
  -e <exer>: edit files related to <exer>
  -h: print help
  -n <exer>: create new exercise and associated test file
@@ -78,9 +80,9 @@ run_test() {
 
 # Use an associative array to hold tests so as to have unique names.
 declare -A to_test=()
-while getopts ":ae:hn:T:t:w:" opt; do
+while getopts ":Aa:e:hn:T:t:w:" opt; do
     case $opt in
-    a)
+    A)
         test_bin find sort
 
         declare tst=
@@ -88,6 +90,11 @@ while getopts ":ae:hn:T:t:w:" opt; do
             run_test $tst
         done
         exit 0
+        ;;
+    a)
+        test_bin git
+        declare -r ex=$(ex_name $OPTARG) t=$(test_name $OPTARG)
+        exec git add $ex $t
         ;;
     e)
         test_bin vim
