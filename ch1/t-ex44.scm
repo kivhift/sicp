@@ -1,5 +1,6 @@
 ; Test 1.44
 (load "close-enough.scm")
+(define tolerance 1e-5)
 
 (define (ident x) x)
 
