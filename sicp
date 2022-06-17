@@ -106,9 +106,14 @@ while getopts ":Aa:e:hn:T:t:w:" opt; do
         exit 0
         ;;
     n)
+        test_bin mkdir
         declare -r ex=$(ex_name $OPTARG) t=$(test_name $OPTARG)
         [ ! -r $ex ] || die "Exercise file already exists: $ex"
         [ ! -r $t ]  || die "Test file already exists: $t"
+
+        declare -r ch=${ex%%/*}
+        [ -d $ch ] || mkdir -p $ch || die "Could not make directory $ch"
+
         echo "; Exercise $OPTARG" > $ex || die "Could not produce $ex"
         echo -e "; Test $OPTARG\n(define (tests-OK?)\n  (and\n    #f\n))" > $t \
             || die "Could not produce $t"
